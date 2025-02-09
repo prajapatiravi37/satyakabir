@@ -11,7 +11,6 @@ class AuthController extends Controller
 {
     public function register(Request $request)
     {
-        // dd($request->all());
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
@@ -40,6 +39,33 @@ class AuthController extends Controller
 
         return response()->json(['token' => $token, 'user' => $user]);
     }
+
+    public function forgotPassword(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email|exists:users,email',
+        ]);
+
+        // Find user by email
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user) {
+            return response()->json(['message' => 'Email not found'], 404);
+        }
+
+        // Generate new password
+        $newPassword = substr(md5(time()), 0, 8); // Random 8-character password
+
+        // Update user's password in the database
+        $user->password = Hash::make($newPassword);
+        $user->save();
+
+        // Send email with the new password
+        \Mail::to($user->email)->send(new \App\Mail\ForgotPasswordMail($newPassword));
+
+        return response()->json(['message' => 'A new password has been sent to your email']);
+    }
+
 
     public function logout(Request $request)
     {
