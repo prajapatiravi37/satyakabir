@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use App\Models\UserBankDetail;
+use App\Models\AdminCompanyDetail;
 
 class UserController extends Controller
 {
@@ -21,10 +22,12 @@ class UserController extends Controller
             'message' => 'User profile fetched successfully.',
             'user' => [
                 'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'mobile_no' => $user->mobile_no,
-                'image' => $user->image ? url('storage/' . $user->image) : url('storage/default.png'),
+                'fullName' => $user->name ?? '',
+                'email' => $user->email ?? '',
+                'mobileNumber' => $user->mobile_no ?? '',
+                'firmName' => $user->firmName ?? '',
+                'officeAddress' => $user->officeAddress ?? '',
+                // 'image' => $user->image ? url('storage/' . $user->image) : url('storage/default.png'),
                 'created_at' => $user->created_at,
                 'updated_at' => $user->updated_at,
             ]
@@ -38,24 +41,28 @@ class UserController extends Controller
 
         // Validate input
         $request->validate([
-            'name' => 'required|string|max:255',
-            'mobile_no' => 'nullable|string|max:15',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048' // Image validation
+            'fullName' => 'required|string|max:255',
+            'mobileNumber' => 'nullable|string|max:15',
+            'firmName' => 'nullable|string|max:15',
+            'officeAddress' => 'nullable|string|max:15',
+            // 'image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048' // Image validation
         ]);
 
         // Update user details
-        $user->name = $request->name;
-        $user->mobile_no = $request->mobile_no;
+        $user->name = $request->fullName;
+        $user->mobile_no = $request->mobileNumber;
+        $user->firmName = $request->firmName;
+        $user->officeAddress = $request->officeAddress;
 
         // Handle profile image upload
-        if ($request->hasFile('image')) {
-            // Delete old image if exists
-            if ($user->image) {
-                Storage::delete($user->image);
-            }
-            $imagePath = $request->file('image')->store('profile_images', 'public');
-            $user->image = $imagePath;
-        }
+        // if ($request->hasFile('image')) {
+        //     // Delete old image if exists
+        //     if ($user->image) {
+        //         Storage::delete($user->image);
+        //     }
+        //     $imagePath = $request->file('image')->store('profile_images', 'public');
+        //     $user->image = $imagePath;
+        // }
 
         $user->save();
 
@@ -64,9 +71,11 @@ class UserController extends Controller
             'message' => 'User profile updated successfully.',
             'user' => [
                 'id' => $user->id,
-                'name' => $user->name,
-                'mobile_no' => $user->mobile_no,
-                'image' => $user->image ? url('storage/' . $user->image) : url('storage/default.png'),
+                'fullName' => $user->name,
+                'mobileNumber' => $user->mobile_no,
+                'firmName' => $user->firmName,
+                'officeAddress' => $user->officeAddress,
+                // 'image' => $user->image ? url('storage/' . $user->image) : url('storage/default.png'),
             ]
         ]);
     }
@@ -183,4 +192,27 @@ class UserController extends Controller
             'bank_details' => $bankDetail
         ]);
     }
+    // Get Company Details API
+    public function getCompanyDetails()
+    {
+        $data = AdminCompanyDetail::first();
+
+        if (!$data) {
+            return response()->json([
+                'status' => 404,
+                'message' => 'No bank details found.'
+            ], 404);
+        }
+
+        return response()->json([
+            'status' => 200,
+            'message' => 'Company details fetched successfully.',
+            'bank_details' => $data
+        ]);
+    }
+
+
+
+
+
 }

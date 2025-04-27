@@ -34,7 +34,7 @@ class ProductDealerController extends Controller
         $formattedProducts = $products->map(function ($product) {
             return [
                 'id' => $product->id,
-                'name' => $product->name . ' - ' . $product->code
+                'name' => $product->name . ' - ' . $product->code .' - '. $product->point
             ];
         });
 
