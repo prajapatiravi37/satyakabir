@@ -210,6 +210,20 @@ class UserController extends Controller
             'bank_details' => $data
         ]);
     }
+    // Delete Bank details
+    public function deleteBankDetails($id)
+    {
+        $result =UserBankDetail::whereId($id)->delete();
+
+        if($result)
+        {
+            return response()->json(array("status" => 200, "message" => "Bank details successfully deleted"),200);
+        }
+        else
+        {
+            return response()->json(array("status" => 500, "message" => "Someting went wrong!!"),500);
+        }    
+    }
 
 
 

@@ -49,6 +49,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/add-bank-details', [UserController::class, 'addBankDetails']);
     Route::get('/get-bank-details', [UserController::class, 'getBankDetails']);
     Route::post('/update-bank-details', [UserController::class, 'updateBankDetails']);
+    Route::post('/delete-bank-details/{id}', [UserController::class, 'deleteBankDetails']);
 
     /* Product Order Routes */
     Route::post('/place-order', [OrderController::class, 'placeOrder']);
