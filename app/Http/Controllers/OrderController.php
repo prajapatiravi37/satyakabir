@@ -12,12 +12,12 @@ class OrderController extends Controller
     public function placeOrder(Request $request)
     {
         // Validate top-level dealer and products
-        $request->validate([
-            'dealer_id' => 'required|exists:dealers,id',
-            'products' => 'required|array|min:1',
-            'products.*.product_id' => 'required|exists:products,id',
-            'products.*.quantity' => 'required|integer|min:1',
-        ]);
+        // $request->validate([
+        //     'dealer_id' => 'required|exists:dealers,id',
+        //     'products' => 'required|array|min:1',
+        //     'products.*.product_id' => 'required|exists:products,id',
+        //     'products.*.quantity' => 'required|integer|min:1',
+        // ]);
 
         $user = Auth::user();
         $orders = [];
