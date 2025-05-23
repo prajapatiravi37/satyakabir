@@ -11,34 +11,39 @@ class OrderController extends Controller
 {
     public function placeOrder(Request $request)
     {
-        // Validate request
+        // Validate top-level dealer and products
         $request->validate([
-            'product_id' => 'required|exists:products,id',
             'dealer_id' => 'required|exists:dealers,id',
-            'quantity' => 'required|integer|min:1',
+            'products' => 'required|array|min:1',
+            'products.*.product_id' => 'required|exists:products,id',
+            'products.*.quantity' => 'required|integer|min:1',
         ]);
 
         $user = Auth::user();
-        $product = Product::find($request->product_id);
+        $orders = [];
 
-        // Calculate redeem points (quantity * product points)
-        $redeem_points = $request->quantity * $product->point;
+        foreach ($request->products as $productData) {
+            $product = Product::find($productData['product_id']);
+            $redeem_points = $productData['quantity'] * $product->point;
 
-        // Insert order
-        $order = Order::create([
-            'user_id' => $user->id,
-            'product_id' => $request->product_id,
-            'dealer_id' => $request->dealer_id,
-            'quantity' => $request->quantity,
-            'redeem_points' => $redeem_points,
-            'order_status' => 'Pending',
-            'order_date' => now(),
-        ]);
+            $order = Order::create([
+                'user_id' => $user->id,
+                'product_id' => $product->id,
+                'dealer_id' => $request->dealer_id,
+                'quantity' => $productData['quantity'],
+                'redeem_points' => $redeem_points,
+                'order_status' => 'Pending',
+                'order_date' => now(),
+            ]);
+
+            $orders[] = $order;
+        }
 
         return response()->json([
             'status' => 200,
-            'message' => 'Order placed successfully.',
-            'order' => $order
+            'message' => 'Orders placed successfully.',
+            'orders' => $orders
         ]);
     }
+
 }
