@@ -11,8 +11,6 @@ class OrderController extends Controller
 {
     public function placeOrder(Request $request)
     {
-    
-
         $user = Auth::user();
         $orders = [];
 
@@ -30,7 +28,20 @@ class OrderController extends Controller
                 'order_date' => now(),
             ]);
 
-            $orders[] = $order;
+            // Load dealer only (product name is from $product directly)
+            $order->load('dealer');
+
+            $orders[] = [
+                'id' => $order->id,
+                'product_id' => $product->id,
+                'product_name' => $product->name ?? 'N/A',
+                'dealer_id' => $order->dealer_id,
+                'dealer_name' => $order->dealer->name ?? 'N/A',
+                'quantity' => $order->quantity,
+                'redeem_points' => $order->redeem_points,
+                'order_status' => $order->order_status,
+                'order_date' => $order->order_date->format('Y-m-d H:i:s'),
+            ];
         }
 
         return response()->json([
@@ -39,6 +50,7 @@ class OrderController extends Controller
             'orders' => $orders
         ]);
     }
+
     public function orderHistory()
     {
         $user = Auth::user();
