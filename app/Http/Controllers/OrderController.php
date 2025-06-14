@@ -11,13 +11,7 @@ class OrderController extends Controller
 {
     public function placeOrder(Request $request)
     {
-        // Validate top-level dealer and products
-        // $request->validate([
-        //     'dealer_id' => 'required|exists:dealers,id',
-        //     'products' => 'required|array|min:1',
-        //     'products.*.product_id' => 'required|exists:products,id',
-        //     'products.*.quantity' => 'required|integer|min:1',
-        // ]);
+    
 
         $user = Auth::user();
         $orders = [];
@@ -45,5 +39,37 @@ class OrderController extends Controller
             'orders' => $orders
         ]);
     }
+    public function orderHistory()
+    {
+        $user = Auth::user();
+
+        $orders = Order::with(['product', 'dealer'])
+            ->where('user_id', $user->id)
+            ->get();
+
+        $data = $orders->map(function ($order) {
+            return [
+                'id' => $order->id,
+                'orderPlacedDate' => \Carbon\Carbon::parse($order->order_date)->format('Y-m-d'),
+                'materialName' => $order->product->type ?? 'N/A',  // Assuming `type` is the material name
+                'productName' => $order->product->name ?? 'N/A',
+                'productCode' => $order->product->code ?? 'N/A',
+                'dealerName' => $order->dealer->name ?? 'N/A',
+                'quantity' => $order->quantity,
+                'status' => $order->order_status,
+            ];
+        });
+
+        return response()->json([
+            'status' => 200,
+            'orders' => $data
+        ]);
+    }
+
+
+
+
+
+
 
 }
