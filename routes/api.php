@@ -54,6 +54,7 @@ Route::middleware('auth:sanctum')->group(function () {
     /* Product Order Routes */
     Route::post('/place-order', [OrderController::class, 'placeOrder']);
     Route::get('/order-history', [OrderController::class, 'orderHistory']);
+    Route::get('/point-summary', [OrderController::class, 'getPointSummary']);
 
 
     /* Company Details Routes */
