@@ -44,7 +44,7 @@ class UserController extends Controller
             'fullName' => 'required|string|max:255',
             'mobileNumber' => 'nullable|string|max:15',
             // 'firmName' => 'nullable|string',
-            'officeAddress' => 'nullable|string|max:15',
+            'officeAddress' => 'nullable|string',
             // 'image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048' // Image validation
         ]);
 

@@ -6,6 +6,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ProductDealerController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\OrderController;
+use App\Http\Controllers\AdminUserController;
 
 /*
 |--------------------------------------------------------------------------
@@ -56,8 +57,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/order-history', [OrderController::class, 'orderHistory']);
     Route::get('/point-summary', [OrderController::class, 'getPointSummary']);
 
+    /* Architect Cancel Order Route */
+    Route::post('/cancel-order/{orderId}', [OrderController::class, 'cancelOrder']);
 
     /* Company Details Routes */
     Route::get('/company-details', [UserController::class, 'getCompanyDetails']);
+
+    /* Admin Routes */
+    Route::get('/admin/dashboard-totals', [AdminUserController::class, 'getDashboardTotals']);
+    Route::get('/admin/all-orders', [AdminUserController::class, 'getAllOrders']);
+    Route::get('/admin/profile', [AdminUserController::class, 'getAdminProfile']);
+    Route::post('/admin/update-profile', [AdminUserController::class, 'updateAdminProfile']);
 
 });

@@ -17,6 +17,14 @@ class Order extends Model
         'redeem_points',
         'order_status',
         'order_date',
+        'admin_confirm',
+        'redeem_point_status',
+    ];
+
+    protected $casts = [
+        'order_date' => 'datetime',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
     ];
 
     // Relationships

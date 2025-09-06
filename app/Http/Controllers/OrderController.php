@@ -144,10 +144,113 @@ class OrderController extends Controller
     return response()->json($summary);
 }
 
+    // Cancel Order API for Architects
+    public function cancelOrder(Request $request, $orderId)
+    {
+        $user = Auth::user();
+       
 
+        // Find the order
+        $order = Order::find($orderId);
+        
+        if (!$order) {
+            return response()->json([
+                'status' => 404,
+                'message' => 'Order not found.'
+            ], 404);
+        }
 
+        // Check if order can be cancelled (not already cancelled or completed)
+        if ($order->order_status === 'Cancelled') {
+            return response()->json([
+                'status' => 400,
+                'message' => 'Order is already cancelled.'
+            ], 400);
+        }
 
+        if ($order->order_status === 'Completed') {
+            return response()->json([
+                'status' => 400,
+                'message' => 'Cannot cancel a completed order.'
+            ], 400);
+        }
 
+        // Update order status to cancelled
+        $order->order_status = 'Cancelled';
+        $order->admin_confirm = '0'; // Reset admin confirmation
+        $order->save();
 
+        // Load related data for response
+        $order->load(['product', 'dealer', 'user']);
+
+        return response()->json([
+            'status' => 200,
+            'message' => 'Order cancelled successfully.',
+            'order' => [
+                'id' => $order->id,
+                'user_id' => $order->user_id,
+                'user_name' => $order->user->name ?? 'N/A',
+                'product_id' => $order->product_id,
+                'product_name' => $order->product->name ?? 'N/A',
+                'dealer_id' => $order->dealer_id,
+                'dealer_name' => $order->dealer->name ?? 'N/A',
+                'quantity' => $order->quantity,
+                'redeem_points' => $order->redeem_points,
+                'order_status' => $order->order_status,
+                'admin_confirm' => $order->admin_confirm,
+                'order_date' => $order->order_date->format('Y-m-d H:i:s'),
+                'cancelled_at' => now()->format('Y-m-d H:i:s'),
+                'cancelled_by' => $user->name
+            ]
+        ]);
+    }
+
+    // Get all orders for architects (admin view)
+    public function getAllOrdersForArchitect()
+    {
+        $user = Auth::user();
+        
+        // Check if user is an architect (admin)
+        if ($user->userRole !== 'admin') {
+            return response()->json([
+                'status' => 403,
+                'message' => 'Access denied. Only architects can view all orders.'
+            ], 403);
+        }
+
+        $orders = Order::with(['product', 'dealer', 'user'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $data = $orders->map(function ($order) {
+            return [
+                'id' => $order->id,
+                'user_id' => $order->user_id,
+                'user_name' => $order->user->name ?? 'N/A',
+                'user_email' => $order->user->email ?? 'N/A',
+                'user_mobile' => $order->user->mobile_no ?? 'N/A',
+                'product_id' => $order->product_id,
+                'product_name' => $order->product->name ?? 'N/A',
+                'product_type' => $order->product->type ?? 'N/A',
+                'dealer_id' => $order->dealer_id,
+                'dealer_name' => $order->dealer->name ?? 'N/A',
+                'quantity' => $order->quantity,
+                'redeem_points' => $order->redeem_points,
+                'order_status' => $order->order_status,
+                'admin_confirm' => $order->admin_confirm,
+                'redeem_point_status' => $order->redeem_point_status,
+                'order_date' => $order->order_date->format('Y-m-d H:i:s'),
+                'created_at' => $order->created_at->format('Y-m-d H:i:s'),
+                'updated_at' => $order->updated_at->format('Y-m-d H:i:s'),
+            ];
+        });
+
+        return response()->json([
+            'status' => 200,
+            'message' => 'All orders fetched successfully.',
+            'orders' => $data,
+            'total_orders' => $data->count()
+        ]);
+    }
 
 }
