@@ -233,4 +233,160 @@ class AdminUserController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Confirm order by admin
+     */
+    public function confirmOrder(Request $request, $orderId)
+    {
+        // Check if user is admin
+        $user = Auth::user();
+        if ($user->userRole !== 'admin') {
+            return response()->json([
+                'status' => 403,
+                'message' => 'Access denied. Admin privileges required.'
+            ], 403);
+        }
+
+        try {
+            // Find the order
+            $order = Order::find($orderId);
+            
+            if (!$order) {
+                return response()->json([
+                    'status' => 404,
+                    'message' => 'Order not found.'
+                ], 404);
+            }
+
+            // Check if order is already confirmed
+            if ($order->admin_confirm == 1) {
+                return response()->json([
+                    'status' => 400,
+                    'message' => 'Order is already confirmed.'
+                ], 400);
+            }
+
+            // Check if order is cancelled
+            if ($order->order_status === 'Cancelled') {
+                return response()->json([
+                    'status' => 400,
+                    'message' => 'Cannot confirm a cancelled order.'
+                ], 400);
+            }
+
+            // Update order confirmation and status
+            $order->admin_confirm = '1';
+            $order->order_status = 'Confirm';
+            $order->save();
+
+            // Load related data for response
+            $order->load(['user', 'product', 'dealer']);
+
+            return response()->json([
+                'status' => 200,
+                'message' => 'Order confirmed successfully.',
+                'data' => [
+                    'id' => $order->id,
+                    'architectName' => $order->user->name ?? 'N/A',
+                    'architectEmail' => $order->user->email ?? 'N/A',
+                    'productName' => $order->product->name ?? 'N/A',
+                    'productCode' => $order->product->code ?? 'N/A',
+                    'dealerName' => $order->dealer->name ?? 'N/A',
+                    'quantity' => $order->quantity,
+                    'redeemPoints' => $order->redeem_points,
+                    'orderStatus' => $order->order_status,
+                    'adminConfirm' => $order->admin_confirm,
+                    'orderDate' => $order->order_date ? $order->order_date->format('Y-m-d H:i:s') : 'N/A',
+                    'confirmedAt' => now()->format('Y-m-d H:i:s'),
+                    'confirmedBy' => $user->name
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 500,
+                'message' => 'Error confirming order.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Mark order as delivered by admin
+     */
+    public function markDelivered(Request $request, $orderId)
+    {
+        // Check if user is admin
+        $user = Auth::user();
+        if ($user->userRole !== 'admin') {
+            return response()->json([
+                'status' => 403,
+                'message' => 'Access denied. Admin privileges required.'
+            ], 403);
+        }
+
+        try {
+            // Find the order
+            $order = Order::find($orderId);
+            
+            if (!$order) {
+                return response()->json([
+                    'status' => 404,
+                    'message' => 'Order not found.'
+                ], 404);
+            }
+
+            // Check if order is already delivered
+            if ($order->order_status === 'Delivered') {
+                return response()->json([
+                    'status' => 400,
+                    'message' => 'Order is already marked as delivered.'
+                ], 400);
+            }
+
+            // Check if order is cancelled
+            if ($order->order_status === 'Cancelled') {
+                return response()->json([
+                    'status' => 400,
+                    'message' => 'Cannot mark a cancelled order as delivered.'
+                ], 400);
+            }
+
+            // Update order confirmation and status
+            $order->admin_confirm = '1';
+            $order->order_status = 'Delivered';
+            $order->save();
+
+            // Load related data for response
+            $order->load(['user', 'product', 'dealer']);
+
+            return response()->json([
+                'status' => 200,
+                'message' => 'Order marked as delivered successfully.',
+                'data' => [
+                    'id' => $order->id,
+                    'architectName' => $order->user->name ?? 'N/A',
+                    'architectEmail' => $order->user->email ?? 'N/A',
+                    'productName' => $order->product->name ?? 'N/A',
+                    'productCode' => $order->product->code ?? 'N/A',
+                    'dealerName' => $order->dealer->name ?? 'N/A',
+                    'quantity' => $order->quantity,
+                    'redeemPoints' => $order->redeem_points,
+                    'orderStatus' => $order->order_status,
+                    'adminConfirm' => $order->admin_confirm,
+                    'orderDate' => $order->order_date ? $order->order_date->format('Y-m-d H:i:s') : 'N/A',
+                    'deliveredAt' => now()->format('Y-m-d H:i:s'),
+                    'deliveredBy' => $user->name
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 500,
+                'message' => 'Error marking order as delivered.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }

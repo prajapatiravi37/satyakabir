@@ -19,6 +19,7 @@ class Order extends Model
         'order_date',
         'admin_confirm',
         'redeem_point_status',
+        'cancellation_reason',
     ];
 
     protected $casts = [

@@ -148,7 +148,11 @@ class OrderController extends Controller
     public function cancelOrder(Request $request, $orderId)
     {
         $user = Auth::user();
-       
+        
+        // Validate the request
+        $request->validate([
+            'cancellation_reason' => 'required|string|max:500'
+        ]);
 
         // Find the order
         $order = Order::find($orderId);
@@ -178,6 +182,7 @@ class OrderController extends Controller
         // Update order status to cancelled
         $order->order_status = 'Cancelled';
         $order->admin_confirm = '0'; // Reset admin confirmation
+        $order->cancellation_reason = $request->cancellation_reason;
         $order->save();
 
         // Load related data for response
@@ -200,7 +205,8 @@ class OrderController extends Controller
                 'admin_confirm' => $order->admin_confirm,
                 'order_date' => $order->order_date->format('Y-m-d H:i:s'),
                 'cancelled_at' => now()->format('Y-m-d H:i:s'),
-                'cancelled_by' => $user->name
+                'cancelled_by' => $user->name,
+                'cancellation_reason' => $order->cancellation_reason
             ]
         ]);
     }

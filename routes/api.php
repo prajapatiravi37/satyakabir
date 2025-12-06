@@ -68,5 +68,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/admin/all-orders', [AdminUserController::class, 'getAllOrders']);
     Route::get('/admin/profile', [AdminUserController::class, 'getAdminProfile']);
     Route::post('/admin/update-profile', [AdminUserController::class, 'updateAdminProfile']);
+    
+    /* Admin Order Management Routes */
+    Route::post('/admin/confirm-order/{orderId}', [AdminUserController::class, 'confirmOrder']);
+    Route::post('/admin/mark-delivered/{orderId}', [AdminUserController::class, 'markDelivered']);
 
 });
