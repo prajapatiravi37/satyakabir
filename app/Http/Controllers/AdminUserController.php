@@ -389,4 +389,151 @@ class AdminUserController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Cancel order by admin
+     */
+    public function cancelOrder(Request $request, $orderId)
+    {
+        // Check if user is admin
+        $user = Auth::user();
+        if ($user->userRole !== 'admin') {
+            return response()->json([
+                'status' => 403,
+                'message' => 'Access denied. Admin privileges required.'
+            ], 403);
+        }
+
+        try {
+            // Validate the request
+            $request->validate([
+                'cancellation_reason' => 'required|string|max:500'
+            ]);
+
+            // Find the order
+            $order = Order::find($orderId);
+            
+            if (!$order) {
+                return response()->json([
+                    'status' => 404,
+                    'message' => 'Order not found.'
+                ], 404);
+            }
+
+            // Check if order is already cancelled
+            if ($order->order_status === 'Cancelled') {
+                return response()->json([
+                    'status' => 400,
+                    'message' => 'Order is already cancelled.'
+                ], 400);
+            }
+
+            // Check if order is already delivered
+            if ($order->order_status === 'Delivered') {
+                return response()->json([
+                    'status' => 400,
+                    'message' => 'Cannot cancel a delivered order.'
+                ], 400);
+            }
+
+            // Check if this order was part of the first order and had quantity >= 50
+            $isFirstOrder = false;
+            $wasEligibleForBonus = false;
+            
+            // Get the user's first order date (including cancelled orders to check if this was first batch)
+            $firstOrder = Order::where('user_id', $order->user_id)
+                ->orderBy('order_date', 'asc')
+                ->orderBy('id', 'asc')
+                ->first();
+            
+            // Check if this order is from the first order batch (same order_date as first order)
+            if ($firstOrder && $firstOrder->order_date->format('Y-m-d H:i:s') === $order->order_date->format('Y-m-d H:i:s')) {
+                $isFirstOrder = true;
+                // Check if this order had quantity >= 50
+                if ($order->quantity >= 50) {
+                    $wasEligibleForBonus = true;
+                }
+            }
+
+            // If cancelling an order that made user eligible for bonus, check remaining orders
+            if ($isFirstOrder && $wasEligibleForBonus) {
+                // Get all orders from the same order_date (excluding the one being cancelled)
+                $remainingOrders = Order::where('user_id', $order->user_id)
+                    ->where('order_date', $order->order_date)
+                    ->where('id', '!=', $order->id)
+                    ->where('order_status', '!=', 'Cancelled')
+                    ->get();
+                
+                // Check if any remaining order has quantity >= 50
+                $hasEligibleOrder = $remainingOrders->contains(function ($remainingOrder) {
+                    return $remainingOrder->quantity >= 50;
+                });
+                
+                // If no remaining order has quantity >= 50, remove bonus points
+                if (!$hasEligibleOrder) {
+                    // Check if bonus points exist and remove them
+                    $bonusPoints = DB::table('user_bonus_points')
+                        ->where('user_id', $order->user_id)
+                        ->where('redeem_points', 2100)
+                        ->where('redeem_point_status', '0')
+                        ->first();
+                    
+                    if ($bonusPoints) {
+                        // Add negative entry to remove bonus points
+                        DB::table('user_bonus_points')->insert([
+                            'user_id' => $order->user_id,
+                            'redeem_points' => -2100, // Negative value to remove bonus
+                            'redeem_point_status' => '0', // 0 = Not redeem
+                            'created_at' => now(),
+                            'updated_at' => now()
+                        ]);
+                    }
+                }
+            }
+
+            // For any cancelled order, set redeem_points to 0 in the order table
+            $order->redeem_points = 0;
+            $order->order_status = 'Cancelled';
+            $order->admin_confirm = '0'; // Reset admin confirmation
+            $order->cancellation_reason = $request->cancellation_reason;
+            $order->save();
+
+            // Load related data for response
+            $order->load(['user', 'product', 'dealer']);
+
+            return response()->json([
+                'status' => 200,
+                'message' => 'Order cancelled successfully.',
+                'data' => [
+                    'id' => $order->id,
+                    'architectName' => $order->user->name ?? 'N/A',
+                    'architectEmail' => $order->user->email ?? 'N/A',
+                    'productName' => $order->product->name ?? 'N/A',
+                    'productCode' => $order->product->code ?? 'N/A',
+                    'dealerName' => $order->dealer->name ?? 'N/A',
+                    'quantity' => $order->quantity,
+                    'redeemPoints' => $order->redeem_points,
+                    'orderStatus' => $order->order_status,
+                    'adminConfirm' => $order->admin_confirm,
+                    'orderDate' => $order->order_date ? $order->order_date->format('Y-m-d H:i:s') : 'N/A',
+                    'cancelledAt' => now()->format('Y-m-d H:i:s'),
+                    'cancelledBy' => $user->name,
+                    'cancellationReason' => $order->cancellation_reason
+                ]
+            ]);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'status' => 422,
+                'message' => 'Validation failed.',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 500,
+                'message' => 'Error cancelling order.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }

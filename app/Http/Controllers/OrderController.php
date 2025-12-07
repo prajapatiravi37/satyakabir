@@ -79,7 +79,7 @@ class OrderController extends Controller
             ->get();
 
         $data = $orders->map(function ($order) {
-            return [
+            $orderData = [
                 'id' => $order->id,
                 'orderPlacedDate' => \Carbon\Carbon::parse($order->order_date)->format('Y-m-d'),
                 'materialName' => $order->product->type ?? 'N/A',  // Assuming `type` is the material name
@@ -89,6 +89,14 @@ class OrderController extends Controller
                 'quantity' => $order->quantity,
                 'status' => $order->order_status,
             ];
+
+            // Add cancellation details if order is cancelled
+            if ($order->order_status === 'Cancelled') {
+                $orderData['cancellationReason'] = $order->cancellation_reason ?? null;
+                $orderData['cancelledDate'] = $order->updated_at ? $order->updated_at->format('Y-m-d H:i:s') : null;
+            }
+
+            return $orderData;
         });
 
         return response()->json([
@@ -105,18 +113,22 @@ class OrderController extends Controller
     // 1. Bonus Points (from user_bonus_points)
     $bonusPoints = DB::table('user_bonus_points')
         ->where('user_id', $user->id)
+        ->orderBy('created_at', 'desc')
         ->get();
 
     foreach ($bonusPoints as $bonus) {
+        $points = (int)$bonus->redeem_points; // Convert string to int
+        $isNegative = $points < 0;
+        
         $summary[] = [
             'id' => 'bonus-' . $bonus->id, // unique ID
             'product_name' => null,
-            'points' => $bonus->redeem_points,
+            'points' => $points, // Can be negative for cancelled orders
             'point_status' => $bonus->redeem_point_status,
-            'type' => 'gain',
+            'type' => $isNegative ? 'redeem' : 'gain',
             'requestedDate' => date('Y-m-d', strtotime($bonus->created_at)),
-            'redemptionAmount' => $bonus->redeem_points,
-            'description' => 'Bonus point',
+            'redemptionAmount' => abs($points), // Always show positive amount
+            'description' => $isNegative ? 'Order Cancellation - Points Deducted' : 'Bonus point',
             'status' => 'completed',
         ];
     }
@@ -127,17 +139,24 @@ class OrderController extends Controller
         ->get();
 
     foreach ($orders as $order) {
+        // For cancelled orders, show negative points
+        $points = $order->order_status === 'Cancelled' ? -$order->redeem_points : $order->redeem_points;
+        $type = $order->order_status === 'Cancelled' ? 'redeem' : ($order->redeem_point_status == 1 ? 'redeem' : 'gain');
+        
         $summary[] = [
             'id' => $order->id,
             'product_name' => $order->product->name ?? null,
-            'points' => $order->redeem_points,
-            'type' => $order->redeem_point_status == 1 ? 'redeem' : 'gain',
+            'points' => $points,
+            'type' => $type,
             'requestedDate' => $order->order_date,
             'adminConfirm' => $order->admin_confirm,
             'redeemPointStatus' => $order->redeem_point_status,
-            'redemptionAmount' => $order->redeem_points,
-            'description' => 'Order ID #' . $order->id . ' - ' . ($order->product->name ?? 'Product'),
-            'status' => 'completed'
+            'redemptionAmount' => abs($order->redeem_points), // Always show positive amount
+            'description' => $order->order_status === 'Cancelled' 
+                ? 'Order ID #' . $order->id . ' - ' . ($order->product->name ?? 'Product') . ' (Cancelled)'
+                : 'Order ID #' . $order->id . ' - ' . ($order->product->name ?? 'Product'),
+            'status' => $order->order_status === 'Cancelled' ? 'cancelled' : 'completed',
+            'orderStatus' => $order->order_status
         ];
     }
 
@@ -172,14 +191,70 @@ class OrderController extends Controller
             ], 400);
         }
 
-        if ($order->order_status === 'Completed') {
+        if ($order->order_status === 'Delivered') {
             return response()->json([
                 'status' => 400,
-                'message' => 'Cannot cancel a completed order.'
+                'message' => 'Cannot cancel a delivered order.'
             ], 400);
         }
 
-        // Update order status to cancelled
+        // Check if this order was part of the first order and had quantity >= 50
+        $isFirstOrder = false;
+        $wasEligibleForBonus = false;
+        
+        // Get the user's first order date (including cancelled orders to check if this was first batch)
+        $firstOrder = Order::where('user_id', $order->user_id)
+            ->orderBy('order_date', 'asc')
+            ->orderBy('id', 'asc')
+            ->first();
+        
+        // Check if this order is from the first order batch (same order_date as first order)
+        if ($firstOrder && $firstOrder->order_date->format('Y-m-d H:i:s') === $order->order_date->format('Y-m-d H:i:s')) {
+            $isFirstOrder = true;
+            // Check if this order had quantity >= 50
+            if ($order->quantity >= 50) {
+                $wasEligibleForBonus = true;
+            }
+        }
+
+        // If cancelling an order that made user eligible for bonus, check remaining orders
+        if ($isFirstOrder && $wasEligibleForBonus) {
+            // Get all orders from the same order_date (excluding the one being cancelled)
+            $remainingOrders = Order::where('user_id', $order->user_id)
+                ->where('order_date', $order->order_date)
+                ->where('id', '!=', $order->id)
+                ->where('order_status', '!=', 'Cancelled')
+                ->get();
+            
+            // Check if any remaining order has quantity >= 50
+            $hasEligibleOrder = $remainingOrders->contains(function ($remainingOrder) {
+                return $remainingOrder->quantity >= 50;
+            });
+            
+            // If no remaining order has quantity >= 50, remove bonus points
+            if (!$hasEligibleOrder) {
+                // Check if bonus points exist and remove them
+                $bonusPoints = DB::table('user_bonus_points')
+                    ->where('user_id', $order->user_id)
+                    ->where('redeem_points', 2100)
+                    ->where('redeem_point_status', '0')
+                    ->first();
+                
+                if ($bonusPoints) {
+                    // Add negative entry to remove bonus points
+                    DB::table('user_bonus_points')->insert([
+                        'user_id' => $order->user_id,
+                        'redeem_points' => -2100, // Negative value to remove bonus
+                        'redeem_point_status' => '0', // 0 = Not redeem
+                        'created_at' => now(),
+                        'updated_at' => now()
+                    ]);
+                }
+            }
+        }
+
+        // For any cancelled order, set redeem_points to 0 in the order table
+        $order->redeem_points = 0;
         $order->order_status = 'Cancelled';
         $order->admin_confirm = '0'; // Reset admin confirmation
         $order->cancellation_reason = $request->cancellation_reason;

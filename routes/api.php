@@ -72,5 +72,6 @@ Route::middleware('auth:sanctum')->group(function () {
     /* Admin Order Management Routes */
     Route::post('/admin/confirm-order/{orderId}', [AdminUserController::class, 'confirmOrder']);
     Route::post('/admin/mark-delivered/{orderId}', [AdminUserController::class, 'markDelivered']);
+    Route::post('/admin/cancel-order/{orderId}', [AdminUserController::class, 'cancelOrder']);
 
 });
